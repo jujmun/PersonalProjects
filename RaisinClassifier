@@ -1,0 +1,141 @@
+# Python 3
+
+#https://www.kaggle.com/code/kanncaa1/deep-learning-tutorial-for-beginners
+    
+import numpy as np # linear algebra
+import pandas as pd # data processing, CSV file I/O (e.g. pd.read_csv)
+import tensorflow as tf
+import matplotlib.pyplot as plt
+from tensorflow import keras
+#import warnings
+
+
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.linear_model import LogisticRegression
+from sklearn.metrics import accuracy_score, classification_report
+
+
+# Input data files are available in the read-only "../input/" directory
+# For example, running this (by clicking run or pressing Shift+Enter) will list all files under the input directory
+
+import os
+for dirname, _, filenames in os.walk('/kaggle/input'):
+    for filename in filenames:
+        src = os.path.join(dirname, filename)
+
+        
+df = pd.read_csv(src)
+
+# Splitting Data
+
+df['Class'] = LabelEncoder().fit_transform(df['Class'])
+
+X = df.drop('Class', axis = 1)
+y = df['Class']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size = 0.2, random_state = 42)
+
+X_train = StandardScaler().fit_transform(X_train).T
+X_test = StandardScaler().fit_transform(X_test).T
+y_train = y_train.to_numpy().reshape(1, -1)
+y_test = y_test.to_numpy().reshape(1, -1)
+
+print("x train: ",X_train.shape)
+print("x test: ",X_test.shape)
+print("y train: ",y_train.shape)
+print("y test: ",y_test.shape)
+df.head(5)
+
+# Forward Propagation 
+
+def initialize(dim):
+    w = np.full((dim,1),0.01)
+    b = 0.0
+    return w,b
+
+def sigmoid(z): 
+    y_hat = 1/(1+np.exp(-z))
+    return y_hat
+
+def forward_prop(w,b,X_train, y_train):
+    z = np.dot(w.T, X_train) + b
+    y_hat = sigmoid(z)
+    
+    loss = -y_train*np.log(y_hat)-(1-y_train)*np.log(1-y_hat)
+    cost = (np.sum(loss))/X_train.shape[1]
+    return cost, y_hat
+
+# Backward Propagation 
+
+def backward_prop(w,b,X_train,y_train):
+    cost, y_hat = forward_prop(w, b, X_train, y_train)
+    dw = (np.dot(X_train, ((y_hat-y_train).T)))/X_train.shape[1]
+    db = np.sum(y_hat-y_train)/X_train.shape[1]
+    gradients = {"dw": dw, "db": db}
+    return gradients
+
+# Updating 
+
+def update(w,b,X_train,y_train, learning_rate, iterations):
+    cost_list = []
+    cost_list2 = []
+    index = []
+    for i in range (iterations):    
+        cost, y_hat = forward_prop(w,b,X_train,y_train)
+        gradients = backward_prop(w, b, X_train, y_train)
+        
+        
+        cost_list.append(cost)
+        
+        # updating the weights and biases 
+        w = w - learning_rate * gradients["dw"]
+        b = b - learning_rate * gradients['db']
+        if i % 20 == 0:
+            cost_list2.append(cost)
+            index.append(i)
+            print ("Cost after iteration %i: %f" %(i, cost))
+    
+    param = {"w": w,"b": b}
+    
+
+    plt.plot(index,cost_list2)
+    plt.xticks(index,rotation='vertical')
+    plt.xlabel("Iterarions")
+    plt.ylabel("Cost")
+    plt.show()
+    
+    return param, gradients, cost_list   
+
+# For Testing 
+
+def predict (w,b,X_test):
+    z = sigmoid(np.dot(w.T,X_test) + b)
+    y_prediction = np.zeros((1,X_test.shape[1]))
+    
+    for i in range (z.shape[1]):
+        if z[0,i] <= 0.5: 
+            y_prediction[0,i] = 0
+        else: 
+            y_prediction[0,i] = 1
+            
+    return y_prediction
+
+def logistic_regression(X_train, y_train, X_test, y_test, learning_rate, iterations):
+    dimension = X_train.shape[0]
+    w,b = initialize(dimension)
+    
+    param, gradients, cost_list = update(w,b,X_train,y_train, learning_rate, iterations)
+    
+    y_pred_train = predict(param["w"], param["b"], X_train)
+    y_pred_test = predict(param["w"], param["b"], X_test)
+
+# Let's Try It!
+
+logistic_regression(X_train, y_train, X_test, y_test,learning_rate = 0.01, iterations = 120)
+
+from sklearn import linear_model
+logreg = linear_model.LogisticRegression(random_state = 42,max_iter= 150)
+y_train = y_train.ravel()
+y_test = y_test.ravel()
+print("test accuracy: {} ".format(logreg.fit(X_train.T, y_train.T).score(X_test.T, y_test.T)))
+print("train accuracy: {} ".format(logreg.fit(X_train.T, y_train.T).score(X_train.T, y_train.T)))
